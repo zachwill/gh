@@ -10,7 +10,15 @@ from collections import defaultdict
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
-from textual.widgets import Button, Header, Footer, Input, Static, Label, SelectionList
+from textual.widgets import (
+    Button,
+    Header,
+    Footer,
+    Input,
+    Static,
+    Label,
+    SelectionList,
+)
 from textual.widgets.selection_list import Selection
 from textual.reactive import reactive
 from textual.timer import Timer
@@ -21,7 +29,7 @@ class GitHubExporter(App):
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("f", "fetch", "Fetch Files"),
+        ("f", "fetch", "Fetch"),
         ("e", "export", "Export"),
         ("c", "cancel_exit", "Cancel Exit"),
     ]
@@ -35,7 +43,23 @@ class GitHubExporter(App):
     Button { width: 20; }
     .input-row { height: auto; margin: 1; }
     .input-row > Horizontal { height: 3; align: left middle; }
-    SelectionList { border: none; }
+
+    /* Updated styles for enhanced SelectionList appearance */
+    SelectionList > .selection-list--button-selected{
+        text-style: bold;
+        color: $foreground;
+        background: $success;
+    }
+    SelectionList > .selection-list--button-selected-highlighted {
+        text-style: bold;
+        color: $foreground;
+        background: $success;
+    }
+    SelectionList:focus > .selection-list--button-selected-highlighted {
+        text-style: bold;
+        color: $foreground;
+        background: $success;
+    }
     """
 
     file_selections = reactive([])
@@ -73,6 +97,7 @@ class GitHubExporter(App):
             self.action_fetch()
         else:
             url_input.focus()
+        # Removed: self.query_one("#export_name").on_submit = self.action_export
 
     def watch_file_selections(self, file_selections):
         file_list = self.query_one("#file_list")
@@ -98,11 +123,21 @@ class GitHubExporter(App):
 
         try:
             parsed_url = urlparse(url)
-            _, user, repo, *_ = parsed_url.path.split("/")
+            path_parts = parsed_url.path.split("/")
+
+            # Extract only the first three parts of the path (user, repo)
+            user, repo = path_parts[1:3]
+
+            # Reconstruct the base repository URL
+            base_url = f"https://github.com/{user}/{repo}"
+
+            # Update the input field with the corrected URL
+            self.query_one("#url_input").value = base_url
+
             self.repo_name = repo
             self.temp_dir = tempfile.mkdtemp()
 
-            clone_command = f"git clone --depth 1 {url} {self.temp_dir}"
+            clone_command = f"git clone --depth 1 {base_url} {self.temp_dir}"
             process = await asyncio.create_subprocess_shell(
                 clone_command,
                 stdout=asyncio.subprocess.PIPE,
