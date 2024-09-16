@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import asyncio
 import os
 import shutil
@@ -276,11 +278,15 @@ class GitHubExporter(App):
 
 
 def main():
-    import sys
+    import argparse
+
+    parser = argparse.ArgumentParser(description="GitHub Repository Exporter")
+    parser.add_argument("url", nargs="?", help="GitHub repository URL")
+    args = parser.parse_args()
 
     app = GitHubExporter()
-    if len(sys.argv) > 1:
-        app.cli_url = sys.argv[1]
+    if args.url:
+        app.cli_url = args.url
     app.run()
 
 
