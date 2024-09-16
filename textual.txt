@@ -1,0 +1,301 @@
+File: tree_example.py
+
+```
+import json
+from pathlib import Path
+
+from rich.text import Text
+
+from textual.app import App, ComposeResult
+from textual.widgets import Header, Footer, Tree
+from textual.widgets.tree import TreeNode
+
+
+class TreeApp(App):
+
+    BINDINGS = [
+        ("a", "add", "Add node"),
+        ("c", "clear", "Clear"),
+        ("t", "toggle_root", "Toggle root"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Footer()
+        yield Tree("Root")
+
+    @classmethod
+    def add_json(cls, node: TreeNode, json_data: object) -> None:
+        """Adds JSON data to a node.
+
+        Args:
+            node (TreeNode): A Tree node.
+            json_data (object): An object decoded from JSON.
+        """
+
+        from rich.highlighter import ReprHighlighter
+
+        highlighter = ReprHighlighter()
+
+        def add_node(name: str, node: TreeNode, data: object) -> None:
+            """Adds a node to the tree.
+
+            Args:
+                name (str): Name of the node.
+                node (TreeNode): Parent node.
+                data (object): Data associated with the node.
+            """
+            if isinstance(data, dict):
+                node.set_label(Text(f"{{}} {name}"))
+                for key, value in data.items():
+                    new_node = node.add("")
+                    add_node(key, new_node, value)
+            elif isinstance(data, list):
+                node.set_label(Text(f"[] {name}"))
+                for index, value in enumerate(data):
+                    new_node = node.add("")
+                    add_node(str(index), new_node, value)
+            else:
+                node.allow_expand = False
+                if name:
+                    label = Text.assemble(
+                        Text.from_markup(f"[b]{name}[/b]="), highlighter(repr(data))
+                    )
+                else:
+                    label = Text(repr(data))
+                node.set_label(label)
+
+        add_node("JSON", node, json_data)
+
+    def on_mount(self) -> None:
+        """Load some JSON when the app starts."""
+        file_path = Path(__file__).parent / "food.json"
+        with open(file_path) as data_file:
+            self.json_data = json.load(data_file)
+
+    def action_add(self) -> None:
+        """Add a node to the tree."""
+        tree = self.query_one(Tree)
+        json_node = tree.root.add("JSON")
+        self.add_json(json_node, self.json_data)
+        tree.root.expand()
+
+    def action_clear(self) -> None:
+        """Clear the tree (remove all nodes)."""
+        tree = self.query_one(Tree)
+        tree.clear()
+
+    def action_toggle_root(self) -> None:
+        """Toggle the root node."""
+        tree = self.query_one(Tree)
+        tree.show_root = not tree.show_root
+
+
+if __name__ == "__main__":
+    app = TreeApp()
+    app.run()
+```
+
+###
+
+File: collapsible_example.py
+
+```
+from textual.app import App, ComposeResult
+from textual.widgets import Collapsible, Footer, Label, Markdown
+
+LETO = """\
+# Duke Leto I Atreides
+
+Head of House Atreides."""
+
+JESSICA = """
+# Lady Jessica
+
+Bene Gesserit and concubine of Leto, and mother of Paul and Alia.
+"""
+
+PAUL = """
+# Paul Atreides
+
+Son of Leto and Jessica.
+"""
+
+
+class CollapsibleApp(App[None]):
+    """An example of collapsible container."""
+
+    BINDINGS = [
+        ("c", "collapse_or_expand(True)", "Collapse All"),
+        ("e", "collapse_or_expand(False)", "Expand All"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        """Compose app with collapsible containers."""
+        yield Footer()
+        with Collapsible(collapsed=False, title="Leto"):
+            yield Label(LETO)
+        yield Collapsible(Markdown(JESSICA), collapsed=False, title="Jessica")
+        with Collapsible(collapsed=True, title="Paul"):
+            yield Markdown(PAUL)
+
+    def action_collapse_or_expand(self, collapse: bool) -> None:
+        for child in self.walk_children(Collapsible):
+            child.collapsed = collapse
+
+
+if __name__ == "__main__":
+    app = CollapsibleApp()
+    app.run()
+```
+
+###
+
+File: checkbox.tcss
+
+```checkbox.tcss
+Screen {
+    align: center middle;
+}
+
+VerticalScroll {
+    width: auto;
+    height: auto;
+    background: $boost;
+    padding: 2;
+}
+```
+
+File: checkbox.py
+
+```checkbox.py
+from textual.app import App, ComposeResult
+from textual.containers import VerticalScroll
+from textual.widgets import Checkbox
+
+
+class CheckboxApp(App[None]):
+    CSS_PATH = "checkbox.tcss"
+
+    def compose(self) -> ComposeResult:
+        with VerticalScroll():
+            yield Checkbox("Arrakis :sweat:")
+            yield Checkbox("Caladan")
+            yield Checkbox("Chusuk")
+            yield Checkbox("[b]Giedi Prime[/b]")
+            yield Checkbox("[magenta]Ginaz[/]")
+            yield Checkbox("Grumman", True)
+            yield Checkbox("Kaitain", id="initial_focus")
+            yield Checkbox("Novebruns", True)
+
+    def on_mount(self):
+        self.query_one("#initial_focus", Checkbox).focus()
+
+
+if __name__ == "__main__":
+    CheckboxApp().run()
+```
+
+###
+
+File: selection.tcss
+
+```
+Screen {
+    align: center middle;
+}
+
+Horizontal {
+    width: 80%;
+    height: 80%;
+}
+
+SelectionList {
+    padding: 1;
+    border: solid $accent;
+    width: 1fr;
+}
+
+Pretty {
+    width: 1fr;
+    border: solid $accent;
+}
+```
+
+File: selectable.py
+
+```
+from textual import on
+from textual.app import App, ComposeResult
+from textual.containers import Horizontal
+from textual.events import Mount
+from textual.widgets import Footer, Header, Pretty, SelectionList
+from textual.widgets.selection_list import Selection
+
+
+class SelectionListApp(App[None]):
+    CSS_PATH = "selectable.tcss"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with Horizontal():
+            yield SelectionList[str](  
+                Selection("Falken's Maze", "secret_back_door", True),
+                Selection("Black Jack", "black_jack"),
+                Selection("Gin Rummy", "gin_rummy"),
+                Selection("Hearts", "hearts"),
+                Selection("Bridge", "bridge"),
+                Selection("Checkers", "checkers"),
+                Selection("Chess", "a_nice_game_of_chess", True),
+                Selection("Poker", "poker"),
+                Selection("Fighter Combat", "fighter_combat", True),
+            )
+            yield Pretty([])
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one(SelectionList).border_title = "Shall we play some games?"
+        self.query_one(Pretty).border_title = "Selected games"
+
+    @on(Mount)
+    @on(SelectionList.SelectedChanged)
+    def update_selected_view(self) -> None:
+        self.query_one(Pretty).update(self.query_one(SelectionList).selected)
+
+
+if __name__ == "__main__":
+    SelectionListApp().run()
+```
+
+###
+
+File: toast_example.py
+
+```
+from textual.app import App
+
+
+class ToastApp(App[None]):
+    def on_mount(self) -> None:
+        # Show an information notification.
+        self.notify("It's an older code, sir, but it checks out.")
+
+        # Show a warning. Note that Textual's notification system allows
+        # for the use of Rich console markup.
+        self.notify(
+            "Now witness the firepower of this fully "
+            "[b]ARMED[/b] and [i][b]OPERATIONAL[/b][/i] battle station!",
+            title="Possible trap detected",
+            severity="warning",
+        )
+
+        # Show an error. Set a longer timeout so it's noticed.
+        self.notify("It's a trap!", severity="error", timeout=10)
+
+        # Show an information notification, but without any sort of title.
+        self.notify("It's against my programming to impersonate a deity.", title="")
+
+
+if __name__ == "__main__":
+    ToastApp().run()
+```
