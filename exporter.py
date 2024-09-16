@@ -7,13 +7,12 @@ import tempfile
 from urllib.parse import urlparse
 from collections import defaultdict
 
+from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import Button, Header, Footer, Input, Static, Label, SelectionList
 from textual.widgets.selection_list import Selection
-from textual import work
 from textual.reactive import reactive
-from textual import on
 from textual.timer import Timer
 
 
