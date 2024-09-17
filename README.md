@@ -1,7 +1,17 @@
-# Exporter
+# GitHub Files to TXT
 
-A simple Textual app for Ben and Ryan.
+```
+python gh.py GITHUB_URL
+```
 
-- Shallow clone of GitHub repo
-- Concats selected files into a single .txt file
+A simple Textual app for grabbing GitHub files.
+
+- Shallow clone GitHub repo into temp directory
+- Concat selected files into a single .txt file
 - Useful for LLMs
+
+## Requirements
+
+```
+pip install textual
+```
