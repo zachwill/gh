@@ -67,6 +67,7 @@ class GitHubExporter(App):
     def __init__(self):
         super().__init__()
         self.temp_dir = None
+        self.is_temp_dir = False  # New flag to track if we're using a temp directory
         self.repo_name = ""
         self.cli_url = ""
         self.exit_timer = None
@@ -115,49 +116,50 @@ class GitHubExporter(App):
     async def action_fetch(self):
         url = self.query_one("#url_input").value
         if not url:
-            self.show_error("Please enter a GitHub URL")
+            self.show_error("Please enter a GitHub URL or '.' for current directory")
             return
 
         self.show_loading(True)
         self.show_error("")
 
         try:
-            parsed_url = urlparse(url)
-            path_parts = parsed_url.path.split("/")
+            if url == ".":
+                # Use current directory
+                self.temp_dir = os.getcwd()
+                self.is_temp_dir = False
+                self.repo_name = os.path.basename(self.temp_dir)
+            else:
+                # Existing GitHub URL handling
+                parsed_url = urlparse(url)
+                path_parts = parsed_url.path.split("/")
+                user, repo = path_parts[1:3]
+                base_url = f"https://github.com/{user}/{repo}"
+                self.query_one("#url_input").value = base_url
+                self.repo_name = repo
+                self.temp_dir = tempfile.mkdtemp(prefix="gh_exporter_")
+                self.is_temp_dir = True
 
-            # Extract only the first three parts of the path (user, repo)
-            user, repo = path_parts[1:3]
+                clone_command = f"git clone --depth 1 {base_url} {self.temp_dir}"
+                process = await asyncio.create_subprocess_shell(
+                    clone_command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await process.communicate()
 
-            # Reconstruct the base repository URL
-            base_url = f"https://github.com/{user}/{repo}"
-
-            # Update the input field with the corrected URL
-            self.query_one("#url_input").value = base_url
-
-            self.repo_name = repo
-            self.temp_dir = tempfile.mkdtemp()
-
-            clone_command = f"git clone --depth 1 {base_url} {self.temp_dir}"
-            process = await asyncio.create_subprocess_shell(
-                clone_command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await process.communicate()
-
-            if process.returncode != 0:
-                raise Exception(f"Git clone failed: {stderr.decode()}")
+                if process.returncode != 0:
+                    raise Exception(f"Git clone failed: {stderr.decode()}")
 
             self.populate_file_list(self.temp_dir)
             self.show_loading(False)
-            self.notify(f"Repository cloned successfully: {self.repo_name}")
+            self.notify(
+                f"{'Directory' if url == '.' else 'Repository'} loaded successfully: {self.repo_name}"
+            )
             self.query_one("#export_name").value = f"{self.repo_name}.txt"
 
         except Exception as e:
             self.show_error(f"Error: {str(e)}")
-            if self.temp_dir:
-                shutil.rmtree(self.temp_dir)
-                self.temp_dir = None
+            self.cleanup_temp_dir()
         finally:
             self.show_loading(False)
 
@@ -297,11 +299,7 @@ class GitHubExporter(App):
     def on_unmount(self) -> None:
         if self.exit_timer:
             self.exit_timer.stop()
-        if self.temp_dir:
-            try:
-                shutil.rmtree(self.temp_dir)
-            except Exception as e:
-                print(f"Error cleaning up temporary directory: {str(e)}")
+        self.cleanup_temp_dir()
 
     def show_loading(self, is_loading: bool):
         self.query_one("#loading").styles.display = "block" if is_loading else "none"
@@ -309,6 +307,16 @@ class GitHubExporter(App):
     def show_error(self, message: str):
         self.query_one("#error_message").update(message)
         self.show_loading(False)
+
+    def cleanup_temp_dir(self):
+        if self.is_temp_dir and self.temp_dir and os.path.exists(self.temp_dir):
+            try:
+                shutil.rmtree(self.temp_dir)
+            except Exception as e:
+                print(f"Error cleaning up temporary directory: {str(e)}")
+            finally:
+                self.temp_dir = None
+                self.is_temp_dir = False
 
 
 def main():
