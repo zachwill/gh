@@ -195,6 +195,8 @@ class GitHubExporter(App):
         for root, dirs, files in os.walk(root_path):
             if ".git" in dirs:
                 dirs.remove(".git")
+            if "node_modules" in dirs:
+                dirs.remove("node_modules")
 
             dirs[:] = [d for d in dirs if not d.startswith(".")]
 
